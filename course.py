@@ -45,7 +45,7 @@ class CourseCatalog:
         self._courses: list[Course] = []
         self._courses_by_code: dict[str, Course] = {}
 
-    def add(self, code: str, title: str) -> Course:
+    def add_course(self, code: str, title: str) -> Course:
         """Create a course, store it, and return it."""
         course = Course(code, title)
         self._courses.append(course)
@@ -62,6 +62,6 @@ class CourseCatalog:
 
 def load_sample_courses(catalog: CourseCatalog) -> None:
     """Add the courses offered when the application starts."""
-    catalog.add("CS101", "Introduction to Programming")
-    catalog.add("MATH201", "Linear Algebra")
-    catalog.add("PHY110", "General Physics")
+    catalog.add_course("CS101", "Introduction to Programming")
+    catalog.add_course("MATH201", "Linear Algebra")
+    catalog.add_course("PHY110", "General Physics")

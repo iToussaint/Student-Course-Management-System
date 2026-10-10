@@ -96,7 +96,7 @@ class StudentRegistry:
         self._students: list[Student] = []
         self._students_by_id: dict[str, Student] = {}
 
-    def add(
+    def add_student(
         self,
         name: str,
         student_type: type[Student] = UndergraduateStudent,

@@ -133,7 +133,7 @@ class ConsoleApp:
 
     # ---------- Lookup helpers ----------
 
-    def find_student(self) -> Student | None:
+    def _find_student(self) -> Student | None:
         """Ask for a student ID and return that student, or None."""
         student_id = prompt_non_empty("Enter student ID: ")
         student = self._students.get(student_id)
@@ -141,26 +141,26 @@ class ConsoleApp:
             print(f"No student found with ID {student_id.upper()}.")
         return student
 
-    def find_course(self) -> Course | None:
+    def _find_course(self) -> Course | None:
         """Show the courses, ask for a code, and return it, or None."""
-        self.show_courses()
+        self._show_courses()
         code = prompt_non_empty("Enter course code: ")
         course = self._catalog.get(code)
         if course is None:
             print(f"No course found with code {code.upper()}.")
         return course
 
-    def find_course_and_student(self) -> tuple[Course, Student] | None:
+    def _find_course_and_student(self) -> tuple[Course, Student] | None:
         """Ask for a course, then a student; None if either is unknown."""
-        course = self.find_course()
+        course = self._find_course()
         if course is None:
             return None
-        student = self.find_student()
+        student = self._find_student()
         if student is None:
             return None
         return course, student
 
-    def show_courses(self) -> None:
+    def _show_courses(self) -> None:
         """Print every available course."""
         print("\nAvailable courses:")
         for course in self._catalog:
@@ -171,7 +171,7 @@ class ConsoleApp:
     def register_student(self) -> None:
         """Register a new student of the chosen type."""
         name = prompt_non_empty("Enter your full name: ")
-        student = self._students.add(name, prompt_student_type())
+        student = self._students.add_student(name, prompt_student_type())
         print(
             f"Registered {student.name} ({student.level}) "
             f"with ID {student.id}."
@@ -179,26 +179,22 @@ class ConsoleApp:
 
     def enroll_in_courses(self) -> None:
         """Enroll a student in one or more courses entered on one line."""
-        student = self.find_student()
+        student = self._find_student()
         if student is None:
             return
-        self.show_courses()
+        self._show_courses()
         entered = prompt_non_empty(
             "Enter course code(s), separated by spaces: "
         )
-        # dict.fromkeys drops repeated codes but keeps the order typed
-        codes = list(dict.fromkeys(entered.upper().split()))
+        # Map each typed code to its course (None if unknown). Dict keys are
+        # unique, so repeated codes are dropped but the typed order is kept.
+        found = {
+            code: self._catalog.get(code) for code in entered.upper().split()
+        }
+        valid = [course for course in found.values() if course is not None]
+        unknown = [code for code, course in found.items() if course is None]
 
-        valid: list[Course] = []
-        unknown: list[str] = []
-        for code in codes:
-            course = self._catalog.get(code)
-            if course is None:
-                unknown.append(code)
-            else:
-                valid.append(course)
-
-        enrolled, already = self._enrollments.enroll(student, *valid)
+        enrolled, already = self._enrollments.enroll_student(student, *valid)
         if enrolled:
             print(f"Enrolled in: {', '.join(c.code for c in enrolled)}")
         if already:
@@ -208,7 +204,7 @@ class ConsoleApp:
 
     def view_student_summary(self) -> None:
         """Show a student's courses, grades, and average."""
-        student = self.find_student()
+        student = self._find_student()
         if student is not None:
             show_report(StudentSummaryReport(student, self._enrollments))
 
@@ -216,17 +212,17 @@ class ConsoleApp:
 
     def view_roster(self) -> None:
         """Show everyone enrolled in a course."""
-        course = self.find_course()
+        course = self._find_course()
         if course is not None:
             show_report(CourseRosterReport(course, self._enrollments))
 
     def add_to_roster(self) -> None:
         """Add a student to a course roster."""
-        selection = self.find_course_and_student()
+        selection = self._find_course_and_student()
         if selection is None:
             return
         course, student = selection
-        enrolled, _ = self._enrollments.enroll(student, course)
+        enrolled, _ = self._enrollments.enroll_student(student, course)
         if enrolled:
             print(f"Added {student.name} to {course.code}.")
         else:
@@ -234,7 +230,7 @@ class ConsoleApp:
 
     def remove_from_roster(self) -> None:
         """Remove a student (and their grade) from a course roster."""
-        selection = self.find_course_and_student()
+        selection = self._find_course_and_student()
         if selection is None:
             return
         course, student = selection
@@ -245,7 +241,7 @@ class ConsoleApp:
 
     def enter_grade(self) -> None:
         """Record a grade for a student enrolled in a course."""
-        selection = self.find_course_and_student()
+        selection = self._find_course_and_student()
         if selection is None:
             return
         course, student = selection
@@ -261,7 +257,7 @@ class ConsoleApp:
 
     def view_course_average(self) -> None:
         """Show the average grade for a course."""
-        course = self.find_course()
+        course = self._find_course()
         if course is None:
             return
         average = self._enrollments.course_average(course)

@@ -74,7 +74,7 @@ class EnrollmentRegistry:
         # Set keeps enrollments unique
         self._enrollments: set[Enrollment] = set()
 
-    def enroll(
+    def enroll_student(
         self, student: Student, *courses: Course
     ) -> tuple[list[Course], list[Course]]:
         """Enroll a student in one or more courses.

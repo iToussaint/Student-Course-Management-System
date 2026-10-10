@@ -48,6 +48,20 @@ source .venv/bin/activate
 python main.py
 ```
 
+## Tests
+
+The tests use the standard library's `unittest`, so nothing extra needs to be
+installed. From the project root:
+
+```bash
+python -m unittest -v
+```
+
+They cover student, course, and enrollment rules (validation, equality,
+duplicate enrollments, averages), the text of both reports, and complete
+menu sessions driven by scripted input, including invalid input and exiting
+with Ctrl+D / Ctrl+Z.
+
 ## Project structure
 
 ```text
@@ -57,6 +71,7 @@ python main.py
 ├── course.py        # Course class and CourseCatalog
 ├── enrollment.py    # Enrollment class and EnrollmentRegistry
 ├── report.py        # Abstract Report class and concrete reports
+├── tests/           # unittest tests, one file per module
 └── pyproject.toml   # Project metadata, dependencies, lint settings
 ```
 
@@ -69,6 +84,14 @@ python main.py
 | List | `StudentRegistry._students`, `CourseCatalog._courses`: the collections in creation order |
 | Dictionary | `_students_by_id`, `_courses_by_code`: fast lookup by ID or code |
 | Set | `EnrollmentRegistry._enrollments`: each student/course pair can appear only once |
+
+**Comprehensions** filter and summarise the data:
+
+- A dict comprehension in `ConsoleApp.enroll_in_courses()` maps each typed
+  course code to its course, dropping repeated codes. List comprehensions
+  then split that map into valid and unknown codes.
+- List comprehensions build rosters, a student's enrollments, the grades to
+  average, and the report lines.
 
 ### Classes
 
@@ -109,8 +132,8 @@ Student (ABC)                Course          Enrollment          Report (ABC)
 
 ### Functions
 
-`StudentRegistry.add(name, student_type, **details)`,
-`EnrollmentRegistry.enroll(student, *courses)`, and
+`StudentRegistry.add_student(name, student_type, **details)`,
+`EnrollmentRegistry.enroll_student(student, *courses)`, and
 `calculate_average(*scores)` use `*args` / `**kwargs` so they accept any
 number of courses, scores, or extra student details.
 
