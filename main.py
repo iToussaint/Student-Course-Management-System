@@ -1,18 +1,15 @@
 """Student Course Management System - console application."""
 
-from course import courses, get_course
-from enrollment import (
-    course_average,
-    enroll_student,
-    get_grade,
-    get_roster,
-    get_student_courses,
-    is_enrolled,
-    record_grade,
-    remove_student,
-    student_average,
+from course import Course, courses, get_course
+from enrollment import course_average, enroll_student, find_enrollment, remove_student
+from report import CourseRosterReport, Report, StudentSummaryReport
+from student import (
+    GraduateStudent,
+    Student,
+    UndergraduateStudent,
+    add_student,
+    get_student,
 )
-from student import add_student, get_student
 
 
 def prompt_non_empty(message: str) -> str:
@@ -38,7 +35,18 @@ def prompt_grade() -> float:
         print("Grade must be between 0 and 100.")
 
 
-def find_student() -> dict[str, str] | None:
+def prompt_student_type() -> type[Student]:
+    """Keep asking until the user picks undergraduate or graduate."""
+    while True:
+        choice = prompt_non_empty("Student type - 1. Undergraduate  2. Graduate: ")
+        if choice == "1":
+            return UndergraduateStudent
+        if choice == "2":
+            return GraduateStudent
+        print("Invalid option. Please enter 1 or 2.")
+
+
+def find_student() -> Student | None:
     student_id = prompt_non_empty("Enter student ID: ")
     student = get_student(student_id)
     if student is None:
@@ -46,7 +54,7 @@ def find_student() -> dict[str, str] | None:
     return student
 
 
-def find_course() -> dict[str, str] | None:
+def find_course() -> Course | None:
     show_courses()
     code = prompt_non_empty("Enter course code: ")
     course = get_course(code)
@@ -58,19 +66,21 @@ def find_course() -> dict[str, str] | None:
 def show_courses() -> None:
     print("\nAvailable courses:")
     for course in courses:
-        print(f"  {course['code']:<8} {course['title']}")
+        print(f"  {course.code:<8} {course.title}")
 
 
-def format_grade(grade: float | None) -> str:
-    return "-" if grade is None else f"{grade:.1f}"
+def show_report(report: Report) -> None:
+    print()
+    print(report.generate())
 
 
 # ---------- Student actions ----------
 
 def register_student() -> None:
     name = prompt_non_empty("Enter your full name: ")
-    student = add_student(name)
-    print(f"Registered {student['name']} with ID {student['id']}.")
+    student_type = prompt_student_type()
+    student = add_student(name, student_type)
+    print(f"Registered {student.name} ({student.level}) with ID {student.id}.")
 
 
 def enroll_in_courses() -> None:
@@ -79,13 +89,19 @@ def enroll_in_courses() -> None:
         return
     show_courses()
     codes = prompt_non_empty("Enter course code(s), separated by spaces: ").upper().split()
-    unknown = [code for code in codes if get_course(code) is None]
-    valid = [code for code in codes if get_course(code) is not None]
-    enrolled, already = enroll_student(student["id"], *valid)
+    valid: list[Course] = []
+    unknown: list[str] = []
+    for code in codes:
+        course = get_course(code)
+        if course is None:
+            unknown.append(code)
+        else:
+            valid.append(course)
+    enrolled, already = enroll_student(student, *valid)
     if enrolled:
-        print(f"Enrolled in: {', '.join(enrolled)}")
+        print(f"Enrolled in: {', '.join(c.code for c in enrolled)}")
     if already:
-        print(f"Already enrolled in: {', '.join(already)}")
+        print(f"Already enrolled in: {', '.join(c.code for c in already)}")
     if unknown:
         print(f"Unknown course code(s): {', '.join(unknown)}")
 
@@ -94,13 +110,7 @@ def view_student_summary() -> None:
     student = find_student()
     if student is None:
         return
-    enrolled = get_student_courses(student["id"])
-    student_grades = {course["code"]: get_grade(student["id"], course["code"]) for course in enrolled}
-    print(f"\nSummary for {student['name']} ({student['id']})")
-    print(f"Courses enrolled: {len(enrolled)}")
-    for course in enrolled:
-        print(f"  {course['code']:<8} {course['title']:<30} Grade: {format_grade(student_grades[course['code']])}")
-    print(f"Average grade: {format_grade(student_average(student['id']))}")
+    show_report(StudentSummaryReport(student))
 
 
 # ---------- Instructor actions ----------
@@ -109,13 +119,7 @@ def view_roster() -> None:
     course = find_course()
     if course is None:
         return
-    roster = get_roster(course["code"])
-    print(f"\nRoster for {course['code']} - {course['title']} ({len(roster)} students)")
-    if not roster:
-        print("  No students enrolled.")
-    for student in roster:
-        grade = get_grade(student["id"], course["code"])
-        print(f"  {student['id']}  {student['name']:<25} Grade: {format_grade(grade)}")
+    show_report(CourseRosterReport(course))
 
 
 def add_to_roster() -> None:
@@ -125,11 +129,11 @@ def add_to_roster() -> None:
     student = find_student()
     if student is None:
         return
-    enrolled, _ = enroll_student(student["id"], course["code"])
+    enrolled, _ = enroll_student(student, course)
     if enrolled:
-        print(f"Added {student['name']} to {course['code']}.")
+        print(f"Added {student.name} to {course.code}.")
     else:
-        print(f"{student['name']} is already on the {course['code']} roster.")
+        print(f"{student.name} is already on the {course.code} roster.")
 
 
 def remove_from_roster() -> None:
@@ -139,10 +143,10 @@ def remove_from_roster() -> None:
     student = find_student()
     if student is None:
         return
-    if remove_student(student["id"], course["code"]):
-        print(f"Removed {student['name']} from {course['code']}.")
+    if remove_student(student, course):
+        print(f"Removed {student.name} from {course.code}.")
     else:
-        print(f"{student['name']} is not on the {course['code']} roster.")
+        print(f"{student.name} is not on the {course.code} roster.")
 
 
 def enter_grade() -> None:
@@ -152,23 +156,23 @@ def enter_grade() -> None:
     student = find_student()
     if student is None:
         return
-    if not is_enrolled(student["id"], course["code"]):
-        print(f"{student['name']} is not enrolled in {course['code']}.")
+    enrollment = find_enrollment(student, course)
+    if enrollment is None:
+        print(f"{student.name} is not enrolled in {course.code}.")
         return
-    grade = prompt_grade()
-    record_grade(student["id"], course["code"], grade)
-    print(f"Recorded {grade:.1f} for {student['name']} in {course['code']}.")
+    enrollment.grade = prompt_grade()
+    print(f"Recorded {enrollment.grade:.1f} for {student.name} in {course.code}.")
 
 
 def view_course_average() -> None:
     course = find_course()
     if course is None:
         return
-    average = course_average(course["code"])
+    average = course_average(course)
     if average is None:
-        print(f"No grades recorded for {course['code']} yet.")
+        print(f"No grades recorded for {course.code} yet.")
     else:
-        print(f"Average grade for {course['code']}: {average:.1f}")
+        print(f"Average grade for {course.code}: {average:.1f}")
 
 
 # ---------- Menus ----------

@@ -1,18 +1,33 @@
 """Course catalogue."""
 
+
+class Course:
+    def __init__(self, code: str, title: str) -> None:
+        self._code = code.upper()
+        self._title = title
+
+    @property
+    def code(self) -> str:
+        return self._code
+
+    @property
+    def title(self) -> str:
+        return self._title
+
+
 # List stores the collection, dictionary maps codes to courses
-courses: list[dict[str, str]] = []
-courses_by_code: dict[str, dict[str, str]] = {}
+courses: list[Course] = []
+courses_by_code: dict[str, Course] = {}
 
 
-def add_course(code: str, title: str) -> dict[str, str]:
-    course = {"code": code.upper(), "title": title}
+def add_course(code: str, title: str) -> Course:
+    course = Course(code, title)
     courses.append(course)
-    courses_by_code[course["code"]] = course
+    courses_by_code[course.code] = course
     return course
 
 
-def get_course(code: str) -> dict[str, str] | None:
+def get_course(code: str) -> Course | None:
     return courses_by_code.get(code.upper())
 
 

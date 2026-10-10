@@ -1,60 +1,90 @@
 """Enrollments and grades linking students to courses."""
 
-from course import courses
-from student import get_student
-
-# Sets keep each course's enrollments unique (course code -> student IDs)
-enrollments: dict[str, set[str]] = {}
-# Grades per course (course code -> student ID -> grade)
-grades: dict[str, dict[str, float]] = {}
+from course import Course
+from student import Student
 
 
-def enroll_student(student_id: str, *course_codes: str) -> tuple[list[str], list[str]]:
+class Enrollment:
+    """A student's place in a course, with an optional grade."""
+
+    def __init__(self, student: Student, course: Course) -> None:
+        self._student = student
+        self._course = course
+        self._grade: float | None = None
+
+    @property
+    def student(self) -> Student:
+        return self._student
+
+    @property
+    def course(self) -> Course:
+        return self._course
+
+    @property
+    def grade(self) -> float | None:
+        return self._grade
+
+    @grade.setter
+    def grade(self, value: float) -> None:
+        if not 0 <= value <= 100:
+            raise ValueError("Grade must be between 0 and 100.")
+        self._grade = value
+
+    # Two enrollments are the same if they link the same student and course,
+    # so the enrollments set keeps them unique.
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Enrollment):
+            return NotImplemented
+        return (self.student.id, self.course.code) == (other.student.id, other.course.code)
+
+    def __hash__(self) -> int:
+        return hash((self.student.id, self.course.code))
+
+
+# Set keeps enrollments unique
+enrollments: set[Enrollment] = set()
+
+
+def enroll_student(student: Student, *courses: Course) -> tuple[list[Course], list[Course]]:
     """Enroll a student in one or more courses.
 
-    Returns (newly enrolled codes, codes the student was already enrolled in).
+    Returns (newly enrolled courses, courses the student was already enrolled in).
     """
     enrolled, already = [], []
-    for code in course_codes:
-        roster = enrollments.setdefault(code.upper(), set())
-        if student_id in roster:
-            already.append(code.upper())
+    for course in courses:
+        enrollment = Enrollment(student, course)
+        if enrollment in enrollments:
+            already.append(course)
         else:
-            roster.add(student_id)
-            enrolled.append(code.upper())
+            enrollments.add(enrollment)
+            enrolled.append(course)
     return enrolled, already
 
 
-def remove_student(student_id: str, course_code: str) -> bool:
+def find_enrollment(student: Student, course: Course) -> Enrollment | None:
+    matches = [e for e in enrollments if e == Enrollment(student, course)]
+    return matches[0] if matches else None
+
+
+def remove_student(student: Student, course: Course) -> bool:
     """Remove a student from a course roster. Returns False if they weren't on it."""
-    roster = enrollments.get(course_code.upper(), set())
-    if student_id not in roster:
+    enrollment = find_enrollment(student, course)
+    if enrollment is None:
         return False
-    roster.remove(student_id)
-    grades.get(course_code.upper(), {}).pop(student_id, None)
+    enrollments.remove(enrollment)
     return True
 
 
-def is_enrolled(student_id: str, course_code: str) -> bool:
-    return student_id in enrollments.get(course_code.upper(), set())
+def get_roster(course: Course) -> list[Enrollment]:
+    """Enrollments in a course, sorted by student name."""
+    roster = [e for e in enrollments if e.course.code == course.code]
+    return sorted(roster, key=lambda e: e.student.name)
 
 
-def get_roster(course_code: str) -> list[dict[str, str]]:
-    """Students enrolled in a course, sorted by name."""
-    roster = [get_student(sid) for sid in enrollments.get(course_code.upper(), set())]
-    return sorted((s for s in roster if s is not None), key=lambda s: s["name"])
-
-
-def get_student_courses(student_id: str) -> list[dict[str, str]]:
-    return [course for course in courses if is_enrolled(student_id, course["code"])]
-
-
-def record_grade(student_id: str, course_code: str, grade: float) -> None:
-    grades.setdefault(course_code.upper(), {})[student_id] = grade
-
-
-def get_grade(student_id: str, course_code: str) -> float | None:
-    return grades.get(course_code.upper(), {}).get(student_id)
+def get_student_enrollments(student: Student) -> list[Enrollment]:
+    """A student's enrollments, sorted by course code."""
+    enrolled = [e for e in enrollments if e.student.id == student.id]
+    return sorted(enrolled, key=lambda e: e.course.code)
 
 
 def calculate_average(*scores: float) -> float | None:
@@ -64,11 +94,9 @@ def calculate_average(*scores: float) -> float | None:
     return sum(scores) / len(scores)
 
 
-def course_average(course_code: str) -> float | None:
-    return calculate_average(*grades.get(course_code.upper(), {}).values())
+def course_average(course: Course) -> float | None:
+    return calculate_average(*[e.grade for e in get_roster(course) if e.grade is not None])
 
 
-def student_average(student_id: str) -> float | None:
-    student_grades = [get_grade(student_id, course["code"]) for course in get_student_courses(student_id)]
-    return calculate_average(*[grade for grade in student_grades if grade is not None])
-
+def student_average(student: Student) -> float | None:
+    return calculate_average(*[e.grade for e in get_student_enrollments(student) if e.grade is not None])
