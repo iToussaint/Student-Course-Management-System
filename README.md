@@ -22,3 +22,9 @@ poetry install
 # macOS / Linux
 source .venv/bin/activate
 ```
+
+## Run
+
+```bash
+python main.py
+```
