@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 
 from course import Course
-from enrollment import get_roster, get_student_enrollments, student_average
+from enrollment import EnrollmentRegistry
 from student import Student
 
 
@@ -34,10 +34,18 @@ class Report(ABC):
 
 
 class StudentSummaryReport(Report):
-    """A student's courses, grades, and average grade."""
+    """A student's courses, grades, and average grade.
 
-    def __init__(self, student: Student) -> None:
+    Args:
+        student: The student the report is about.
+        enrollments: Where the student's enrollments are read from.
+    """
+
+    def __init__(
+        self, student: Student, enrollments: EnrollmentRegistry
+    ) -> None:
         self._student = student
+        self._enrollments = enrollments
 
     @property
     def title(self) -> str:
@@ -48,8 +56,8 @@ class StudentSummaryReport(Report):
 
     def lines(self) -> list[str]:
         """Return one line per course, followed by the average grade."""
-        enrolled = get_student_enrollments(self._student)
-        average = student_average(self._student)
+        enrolled = self._enrollments.for_student(self._student)
+        average = self._enrollments.student_average(self._student)
         return [
             f"Courses enrolled: {len(enrolled)}",
             *[
@@ -62,10 +70,18 @@ class StudentSummaryReport(Report):
 
 
 class CourseRosterReport(Report):
-    """Everyone enrolled in a course, with their level and grade."""
+    """Everyone enrolled in a course, with their level and grade.
 
-    def __init__(self, course: Course) -> None:
+    Args:
+        course: The course the report is about.
+        enrollments: Where the course roster is read from.
+    """
+
+    def __init__(
+        self, course: Course, enrollments: EnrollmentRegistry
+    ) -> None:
         self._course = course
+        self._enrollments = enrollments
 
     @property
     def title(self) -> str:
@@ -74,7 +90,7 @@ class CourseRosterReport(Report):
 
     def lines(self) -> list[str]:
         """Return a count line, then one line per enrolled student."""
-        roster = get_roster(self._course)
+        roster = self._enrollments.roster(self._course)
         if not roster:
             return ["No students enrolled."]
         return [f"{len(roster)} student(s)"] + [

@@ -22,17 +22,13 @@ class Student(ABC):
         self._details = details
 
     @classmethod
-    def register(cls, name: str, **details: str) -> Self:
-        """Create a student of this class, store it, and return it.
+    def create(cls, number: int, name: str, **details: str) -> Self:
+        """Create a student of this class from a sequence number.
 
-        Called on a subclass (e.g. GraduateStudent.register) it creates
-        that subclass. IDs come from the registry size, so every ID
-        belongs to a stored student and there are no gaps.
+        Called on a subclass (e.g. GraduateStudent.create) it creates
+        that subclass. The number is turned into an ID such as "S001".
         """
-        student = cls(f"S{len(students) + 1:03d}", name, **details)
-        students.append(student)
-        students_by_id[student.id] = student
-        return student
+        return cls(f"S{number:03d}", name, **details)
 
     @property
     def id(self) -> str:
@@ -92,26 +88,35 @@ class GraduateStudent(Student):
         return "Graduate"
 
 
-# List stores the collection, dictionary maps IDs to students
-students: list[Student] = []
-students_by_id: dict[str, Student] = {}
+class StudentRegistry:
+    """Stores registered students and looks them up by ID."""
 
+    def __init__(self) -> None:
+        # List stores the collection, dictionary maps IDs to students
+        self._students: list[Student] = []
+        self._students_by_id: dict[str, Student] = {}
 
-def add_student(
-    name: str,
-    student_type: type[Student] = UndergraduateStudent,
-    **details: str,
-) -> Student:
-    """Register a new student of the given type and return it.
+    def add(
+        self,
+        name: str,
+        student_type: type[Student] = UndergraduateStudent,
+        **details: str,
+    ) -> Student:
+        """Register a new student of the given type and return it.
 
-    Args:
-        name: The student's full name.
-        student_type: Which Student subclass to create.
-        **details: Optional extra information, e.g. email="...".
-    """
-    return student_type.register(name, **details)
+        IDs come from the registry size, so every ID belongs to a stored
+        student and there are no gaps.
 
+        Args:
+            name: The student's full name.
+            student_type: Which Student subclass to create.
+            **details: Optional extra information, e.g. email="...".
+        """
+        student = student_type.create(len(self._students) + 1, name, **details)
+        self._students.append(student)
+        self._students_by_id[student.id] = student
+        return student
 
-def get_student(student_id: str) -> Student | None:
-    """Return the student with this ID (case-insensitive), or None."""
-    return students_by_id.get(student_id.upper())
+    def get(self, student_id: str) -> Student | None:
+        """Return the student with this ID (case-insensitive), or None."""
+        return self._students_by_id.get(student_id.upper())

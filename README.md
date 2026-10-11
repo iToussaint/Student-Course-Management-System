@@ -52,10 +52,10 @@ python main.py
 
 ```text
 .
-├── main.py          # Console menus and input/output only
-├── student.py       # Student class hierarchy and student registry
-├── course.py        # Course class and course catalogue
-├── enrollment.py    # Enrollment class, enrolling, rosters, averages
+├── main.py          # ConsoleApp: menus and input/output only
+├── student.py       # Student class hierarchy and StudentRegistry
+├── course.py        # Course class and CourseCatalog
+├── enrollment.py    # Enrollment class and EnrollmentRegistry
 ├── report.py        # Abstract Report class and concrete reports
 └── pyproject.toml   # Project metadata, dependencies, lint settings
 ```
@@ -66,9 +66,9 @@ python main.py
 
 | Structure | Used for |
 |---|---|
-| List | `students`, `courses`: the collections in creation order |
-| Dictionary | `students_by_id`, `courses_by_code`: fast lookup by ID or code |
-| Set | `enrollments`: each student/course pair can appear only once |
+| List | `StudentRegistry._students`, `CourseCatalog._courses`: the collections in creation order |
+| Dictionary | `_students_by_id`, `_courses_by_code`: fast lookup by ID or code |
+| Set | `EnrollmentRegistry._enrollments`: each student/course pair can appear only once |
 
 ### Classes
 
@@ -88,14 +88,30 @@ Student (ABC)                Course          Enrollment          Report (ABC)
   `title` and `lines()` to each subclass.
 - **Magic methods:** `__repr__` for readable debugging output, `__eq__` and
   `__hash__` so objects compare by ID/code and work in sets.
-- **Class and static methods:** `Student.register()` creates and stores a
-  student of whichever subclass it is called on; `Enrollment.is_valid_grade()`
+- **Class and static methods:** `Student.create()` builds a student of
+  whichever subclass it is called on; `Enrollment.is_valid_grade()`
   and `Report.format_grade()` are helpers that need no instance.
+
+### SOLID principles
+
+- **Single responsibility:** entities (`Student`, `Course`, `Enrollment`)
+  hold data and validation only; storage and lookup live in the registry
+  classes; `ConsoleApp` only handles input and output; reports only format.
+- **Open/closed:** new reports subclass `Report`, new student types subclass
+  `Student` and are added to `STUDENT_TYPES`, without changing existing code.
+- **Liskov substitution:** any `Student` subclass or `Report` subclass can be
+  used wherever the base class is expected.
+- **Interface segregation:** each abstract base asks for only what it needs
+  (`level` for students; `title` and `lines()` for reports).
+- **Dependency inversion:** `ConsoleApp` and the reports receive their
+  registries through their constructors instead of reaching for globals;
+  `main()` is the one place that wires them together.
 
 ### Functions
 
-`add_student(name, student_type, **details)`, `enroll_student(student, *courses)`,
-and `calculate_average(*scores)` use `*args` / `**kwargs` so they accept any
+`StudentRegistry.add(name, student_type, **details)`,
+`EnrollmentRegistry.enroll(student, *courses)`, and
+`calculate_average(*scores)` use `*args` / `**kwargs` so they accept any
 number of courses, scores, or extra student details.
 
 ## Sample session

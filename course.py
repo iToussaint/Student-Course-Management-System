@@ -1,4 +1,6 @@
-"""Course catalogue: the Course class and the course registry."""
+"""Course catalogue: the Course class and the course catalogue."""
+
+from collections.abc import Iterator
 
 
 class Course:
@@ -35,26 +37,31 @@ class Course:
         return hash(self.code)
 
 
-# List stores the collection, dictionary maps codes to courses
-courses: list[Course] = []
-courses_by_code: dict[str, Course] = {}
+class CourseCatalog:
+    """Stores the available courses and looks them up by code."""
+
+    def __init__(self) -> None:
+        # List stores the collection, dictionary maps codes to courses
+        self._courses: list[Course] = []
+        self._courses_by_code: dict[str, Course] = {}
+
+    def add(self, code: str, title: str) -> Course:
+        """Create a course, store it, and return it."""
+        course = Course(code, title)
+        self._courses.append(course)
+        self._courses_by_code[course.code] = course
+        return course
+
+    def get(self, code: str) -> Course | None:
+        """Return the course with this code (case-insensitive), or None."""
+        return self._courses_by_code.get(code.upper())
+
+    def __iter__(self) -> Iterator[Course]:
+        return iter(self._courses)
 
 
-def add_course(code: str, title: str) -> Course:
-    """Create a course, store it, and return it."""
-    course = Course(code, title)
-    courses.append(course)
-    courses_by_code[course.code] = course
-    return course
-
-
-def get_course(code: str) -> Course | None:
-    """Return the course with this code (case-insensitive), or None."""
-    return courses_by_code.get(code.upper())
-
-
-def load_sample_courses() -> None:
+def load_sample_courses(catalog: CourseCatalog) -> None:
     """Add the courses offered when the application starts."""
-    add_course("CS101", "Introduction to Programming")
-    add_course("MATH201", "Linear Algebra")
-    add_course("PHY110", "General Physics")
+    catalog.add("CS101", "Introduction to Programming")
+    catalog.add("MATH201", "Linear Algebra")
+    catalog.add("PHY110", "General Physics")

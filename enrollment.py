@@ -60,63 +60,6 @@ class Enrollment:
         return hash((self.student, self.course))
 
 
-# Set keeps enrollments unique
-enrollments: set[Enrollment] = set()
-
-
-def enroll_student(
-    student: Student, *courses: Course
-) -> tuple[list[Course], list[Course]]:
-    """Enroll a student in one or more courses.
-
-    Returns:
-        (courses newly enrolled in, courses the student was already in).
-    """
-    enrolled, already = [], []
-    for course in courses:
-        enrollment = Enrollment(student, course)
-        if enrollment in enrollments:  # fast set lookup via __hash__/__eq__
-            already.append(course)
-        else:
-            enrollments.add(enrollment)
-            enrolled.append(course)
-    return enrolled, already
-
-
-def find_enrollment(student: Student, course: Course) -> Enrollment | None:
-    """Return the student's enrollment in the course, or None."""
-    target = Enrollment(student, course)
-    if target not in enrollments:
-        return None
-    # The set holds the original object (with its grade), so fetch that one
-    return next(e for e in enrollments if e == target)
-
-
-def remove_student(student: Student, course: Course) -> bool:
-    """Remove a student from a course roster.
-
-    Returns:
-        True if removed, False if they weren't on the roster.
-    """
-    enrollment = find_enrollment(student, course)
-    if enrollment is None:
-        return False
-    enrollments.remove(enrollment)
-    return True
-
-
-def get_roster(course: Course) -> list[Enrollment]:
-    """Return the enrollments in a course, sorted by student name."""
-    roster = [e for e in enrollments if e.course == course]
-    return sorted(roster, key=lambda e: e.student.name)
-
-
-def get_student_enrollments(student: Student) -> list[Enrollment]:
-    """Return a student's enrollments, sorted by course code."""
-    enrolled = [e for e in enrollments if e.student == student]
-    return sorted(enrolled, key=lambda e: e.course.code)
-
-
 def calculate_average(*scores: float) -> float | None:
     """Return the average of any number of scores, or None if none given."""
     if not scores:
@@ -124,15 +67,71 @@ def calculate_average(*scores: float) -> float | None:
     return sum(scores) / len(scores)
 
 
-def course_average(course: Course) -> float | None:
-    """Return the average grade in a course, ignoring ungraded students."""
-    roster = get_roster(course)
-    return calculate_average(*[e.grade for e in roster if e.grade is not None])
+class EnrollmentRegistry:
+    """Stores enrollments and answers questions about rosters and grades."""
 
+    def __init__(self) -> None:
+        # Set keeps enrollments unique
+        self._enrollments: set[Enrollment] = set()
 
-def student_average(student: Student) -> float | None:
-    """Return a student's average grade, ignoring ungraded courses."""
-    enrolled = get_student_enrollments(student)
-    return calculate_average(
-        *[e.grade for e in enrolled if e.grade is not None]
-    )
+    def enroll(
+        self, student: Student, *courses: Course
+    ) -> tuple[list[Course], list[Course]]:
+        """Enroll a student in one or more courses.
+
+        Returns:
+            (courses newly enrolled in, courses the student was already in).
+        """
+        enrolled, already = [], []
+        for course in courses:
+            enrollment = Enrollment(student, course)
+            # Fast set lookup via __hash__/__eq__
+            if enrollment in self._enrollments:
+                already.append(course)
+            else:
+                self._enrollments.add(enrollment)
+                enrolled.append(course)
+        return enrolled, already
+
+    def find(self, student: Student, course: Course) -> Enrollment | None:
+        """Return the student's enrollment in the course, or None."""
+        target = Enrollment(student, course)
+        if target not in self._enrollments:
+            return None
+        # The set holds the original object (with its grade), so fetch it
+        return next(e for e in self._enrollments if e == target)
+
+    def remove(self, student: Student, course: Course) -> bool:
+        """Remove a student from a course roster.
+
+        Returns:
+            True if removed, False if they weren't on the roster.
+        """
+        enrollment = self.find(student, course)
+        if enrollment is None:
+            return False
+        self._enrollments.remove(enrollment)
+        return True
+
+    def roster(self, course: Course) -> list[Enrollment]:
+        """Return the enrollments in a course, sorted by student name."""
+        roster = [e for e in self._enrollments if e.course == course]
+        return sorted(roster, key=lambda e: e.student.name)
+
+    def for_student(self, student: Student) -> list[Enrollment]:
+        """Return a student's enrollments, sorted by course code."""
+        enrolled = [e for e in self._enrollments if e.student == student]
+        return sorted(enrolled, key=lambda e: e.course.code)
+
+    def course_average(self, course: Course) -> float | None:
+        """Return the average grade in a course, ignoring ungraded students."""
+        return calculate_average(
+            *[e.grade for e in self.roster(course) if e.grade is not None]
+        )
+
+    def student_average(self, student: Student) -> float | None:
+        """Return a student's average grade, ignoring ungraded courses."""
+        enrolled = self.for_student(student)
+        return calculate_average(
+            *[e.grade for e in enrolled if e.grade is not None]
+        )
