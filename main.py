@@ -1,6 +1,12 @@
-"""Student Course Management System - console application."""
+"""Student Course Management System - console application.
 
-from course import Course, courses, get_course
+This module only handles input and output. The data and logic live in
+student.py, course.py, enrollment.py, and report.py.
+"""
+
+from collections.abc import Callable
+
+from course import Course, courses, get_course, load_sample_courses
 from enrollment import (
     Enrollment,
     course_average,
@@ -17,9 +23,20 @@ from student import (
     get_student,
 )
 
+# A menu maps the key the user types to (label, action to run)
+Menu = dict[str, tuple[str, Callable[[], None]]]
+
+STUDENT_TYPES: dict[str, type[Student]] = {
+    "1": UndergraduateStudent,
+    "2": GraduateStudent,
+}
+
+
+# ---------- Input helpers ----------
+
 
 def prompt_non_empty(message: str) -> str:
-    """Keep asking until the user enters something."""
+    """Keep asking until the user enters something, then return it."""
     while True:
         value = input(message).strip()
         if value:
@@ -42,17 +59,18 @@ def prompt_grade() -> float:
 
 
 def prompt_student_type() -> type[Student]:
-    """Keep asking until the user picks undergraduate or graduate."""
+    """Keep asking until the user picks a valid student type."""
     while True:
-        choice = prompt_non_empty("Student type - 1. Undergraduate  2. Graduate: ")
-        if choice == "1":
-            return UndergraduateStudent
-        if choice == "2":
-            return GraduateStudent
+        choice = prompt_non_empty(
+            "Student type - 1. Undergraduate  2. Graduate: "
+        )
+        if choice in STUDENT_TYPES:
+            return STUDENT_TYPES[choice]
         print("Invalid option. Please enter 1 or 2.")
 
 
 def find_student() -> Student | None:
+    """Ask for a student ID and return that student, or None if unknown."""
     student_id = prompt_non_empty("Enter student ID: ")
     student = get_student(student_id)
     if student is None:
@@ -61,6 +79,7 @@ def find_student() -> Student | None:
 
 
 def find_course() -> Course | None:
+    """Show the courses, ask for a code, and return it, or None if unknown."""
     show_courses()
     code = prompt_non_empty("Enter course code: ")
     course = get_course(code)
@@ -69,32 +88,53 @@ def find_course() -> Course | None:
     return course
 
 
+def find_course_and_student() -> tuple[Course, Student] | None:
+    """Ask for a course, then a student; return None if either is unknown."""
+    course = find_course()
+    if course is None:
+        return None
+    student = find_student()
+    if student is None:
+        return None
+    return course, student
+
+
+# ---------- Output helpers ----------
+
+
 def show_courses() -> None:
+    """Print every available course."""
     print("\nAvailable courses:")
     for course in courses:
         print(f"  {course.code:<8} {course.title}")
 
 
 def show_report(report: Report) -> None:
+    """Print any kind of report; each Report subclass builds its own."""
     print()
     print(report.generate())
 
 
 # ---------- Student actions ----------
 
+
 def register_student() -> None:
+    """Register a new student of the chosen type."""
     name = prompt_non_empty("Enter your full name: ")
-    student_type = prompt_student_type()
-    student = add_student(name, student_type)
+    student = add_student(name, prompt_student_type())
     print(f"Registered {student.name} ({student.level}) with ID {student.id}.")
 
 
 def enroll_in_courses() -> None:
+    """Enroll a student in one or more courses entered on one line."""
     student = find_student()
     if student is None:
         return
     show_courses()
-    codes = prompt_non_empty("Enter course code(s), separated by spaces: ").upper().split()
+    entered = prompt_non_empty("Enter course code(s), separated by spaces: ")
+    # dict.fromkeys drops repeated codes but keeps the order they were typed
+    codes = list(dict.fromkeys(entered.upper().split()))
+
     valid: list[Course] = []
     unknown: list[str] = []
     for code in codes:
@@ -103,6 +143,7 @@ def enroll_in_courses() -> None:
             unknown.append(code)
         else:
             valid.append(course)
+
     enrolled, already = enroll_student(student, *valid)
     if enrolled:
         print(f"Enrolled in: {', '.join(c.code for c in enrolled)}")
@@ -113,28 +154,28 @@ def enroll_in_courses() -> None:
 
 
 def view_student_summary() -> None:
+    """Show a student's courses, grades, and average."""
     student = find_student()
-    if student is None:
-        return
-    show_report(StudentSummaryReport(student))
+    if student is not None:
+        show_report(StudentSummaryReport(student))
 
 
 # ---------- Instructor actions ----------
 
+
 def view_roster() -> None:
+    """Show everyone enrolled in a course."""
     course = find_course()
-    if course is None:
-        return
-    show_report(CourseRosterReport(course))
+    if course is not None:
+        show_report(CourseRosterReport(course))
 
 
 def add_to_roster() -> None:
-    course = find_course()
-    if course is None:
+    """Add a student to a course roster."""
+    selection = find_course_and_student()
+    if selection is None:
         return
-    student = find_student()
-    if student is None:
-        return
+    course, student = selection
     enrolled, _ = enroll_student(student, course)
     if enrolled:
         print(f"Added {student.name} to {course.code}.")
@@ -143,12 +184,11 @@ def add_to_roster() -> None:
 
 
 def remove_from_roster() -> None:
-    course = find_course()
-    if course is None:
+    """Remove a student (and their grade) from a course roster."""
+    selection = find_course_and_student()
+    if selection is None:
         return
-    student = find_student()
-    if student is None:
-        return
+    course, student = selection
     if remove_student(student, course):
         print(f"Removed {student.name} from {course.code}.")
     else:
@@ -156,21 +196,23 @@ def remove_from_roster() -> None:
 
 
 def enter_grade() -> None:
-    course = find_course()
-    if course is None:
+    """Record a grade for a student enrolled in a course."""
+    selection = find_course_and_student()
+    if selection is None:
         return
-    student = find_student()
-    if student is None:
-        return
+    course, student = selection
     enrollment = find_enrollment(student, course)
     if enrollment is None:
         print(f"{student.name} is not enrolled in {course.code}.")
         return
     enrollment.grade = prompt_grade()
-    print(f"Recorded {enrollment.grade:.1f} for {student.name} in {course.code}.")
+    print(
+        f"Recorded {enrollment.grade:.1f} for {student.name} in {course.code}."
+    )
 
 
 def view_course_average() -> None:
+    """Show the average grade for a course."""
     course = find_course()
     if course is None:
         return
@@ -183,69 +225,54 @@ def view_course_average() -> None:
 
 # ---------- Menus ----------
 
-def student_menu() -> None:
+
+def run_menu(title: str, options: Menu, exit_label: str = "Back") -> None:
+    """Show a menu and run the chosen action until the user picks 0."""
     while True:
-        print("\n--- Student Menu ---")
-        print("1. Register")
-        print("2. Enroll in courses")
-        print("3. View summary")
-        print("0. Back")
+        print(f"\n--- {title} ---")
+        for key, (label, _) in options.items():
+            print(f"{key}. {label}")
+        print(f"0. {exit_label}")
+
         choice = input("Choose an option: ").strip()
-        if choice == "1":
-            register_student()
-        elif choice == "2":
-            enroll_in_courses()
-        elif choice == "3":
-            view_student_summary()
-        elif choice == "0":
-            break
+        if choice == "0":
+            return
+        if choice in options:
+            _, action = options[choice]
+            action()
         else:
             print("Invalid option. Please try again.")
 
 
-def instructor_menu() -> None:
-    while True:
-        print("\n--- Instructor Menu ---")
-        print("1. View course roster")
-        print("2. Add student to roster")
-        print("3. Remove student from roster")
-        print("4. Record grade")
-        print("5. View course average")
-        print("0. Back")
-        choice = input("Choose an option: ").strip()
-        if choice == "1":
-            view_roster()
-        elif choice == "2":
-            add_to_roster()
-        elif choice == "3":
-            remove_from_roster()
-        elif choice == "4":
-            enter_grade()
-        elif choice == "5":
-            view_course_average()
-        elif choice == "0":
-            break
-        else:
-            print("Invalid option. Please try again.")
+STUDENT_MENU: Menu = {
+    "1": ("Register", register_student),
+    "2": ("Enroll in courses", enroll_in_courses),
+    "3": ("View summary", view_student_summary),
+}
+
+INSTRUCTOR_MENU: Menu = {
+    "1": ("View course roster", view_roster),
+    "2": ("Add student to roster", add_to_roster),
+    "3": ("Remove student from roster", remove_from_roster),
+    "4": ("Record grade", enter_grade),
+    "5": ("View course average", view_course_average),
+}
+
+MAIN_MENU: Menu = {
+    "1": ("Student", lambda: run_menu("Student Menu", STUDENT_MENU)),
+    "2": ("Instructor", lambda: run_menu("Instructor Menu", INSTRUCTOR_MENU)),
+}
 
 
 def main() -> None:
+    """Start the application and run the main menu."""
+    load_sample_courses()
     print("Welcome to the Student Course Management System")
-    while True:
-        print("\n=== Main Menu ===")
-        print("1. Student")
-        print("2. Instructor")
-        print("0. Exit")
-        choice = input("Choose an option: ").strip()
-        if choice == "1":
-            student_menu()
-        elif choice == "2":
-            instructor_menu()
-        elif choice == "0":
-            print("Goodbye!")
-            break
-        else:
-            print("Invalid option. Please try again.")
+    try:
+        run_menu("Main Menu", MAIN_MENU, exit_label="Exit")
+    except (KeyboardInterrupt, EOFError):
+        print()  # Ctrl+C or end of input: finish the line, then exit cleanly
+    print("Goodbye!")
 
 
 if __name__ == "__main__":

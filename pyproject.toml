@@ -21,3 +21,15 @@ build-backend = "poetry.core.masonry.api"
 dev = [
     "mypy (>=2.4.0,<3.0.0)"
 ]
+
+[tool.ruff]
+line-length = 79  # PEP 8 maximum
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, import order, naming, docstrings
+select = ["E", "W", "F", "I", "N", "D"]
+# __init__ args are documented in the class docstring; magic methods are self-explanatory
+ignore = ["D105", "D107"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
