@@ -26,19 +26,26 @@ class Enrollment:
 
     @grade.setter
     def grade(self, value: float) -> None:
-        if not 0 <= value <= 100:
+        if not Enrollment.is_valid_grade(value):
             raise ValueError("Grade must be between 0 and 100.")
         self._grade = value
+
+    @staticmethod
+    def is_valid_grade(value: float) -> bool:
+        return 0 <= value <= 100
+
+    def __repr__(self) -> str:
+        return f"Enrollment(student={self.student.id!r}, course={self.course.code!r}, grade={self.grade!r})"
 
     # Two enrollments are the same if they link the same student and course,
     # so the enrollments set keeps them unique.
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Enrollment):
             return NotImplemented
-        return (self.student.id, self.course.code) == (other.student.id, other.course.code)
+        return (self.student, self.course) == (other.student, other.course)
 
     def __hash__(self) -> int:
-        return hash((self.student.id, self.course.code))
+        return hash((self.student, self.course))
 
 
 # Set keeps enrollments unique
@@ -77,13 +84,13 @@ def remove_student(student: Student, course: Course) -> bool:
 
 def get_roster(course: Course) -> list[Enrollment]:
     """Enrollments in a course, sorted by student name."""
-    roster = [e for e in enrollments if e.course.code == course.code]
+    roster = [e for e in enrollments if e.course == course]
     return sorted(roster, key=lambda e: e.student.name)
 
 
 def get_student_enrollments(student: Student) -> list[Enrollment]:
     """A student's enrollments, sorted by course code."""
-    enrolled = [e for e in enrollments if e.student.id == student.id]
+    enrolled = [e for e in enrollments if e.student == student]
     return sorted(enrolled, key=lambda e: e.course.code)
 
 

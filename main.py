@@ -1,7 +1,13 @@
 """Student Course Management System - console application."""
 
 from course import Course, courses, get_course
-from enrollment import course_average, enroll_student, find_enrollment, remove_student
+from enrollment import (
+    Enrollment,
+    course_average,
+    enroll_student,
+    find_enrollment,
+    remove_student,
+)
 from report import CourseRosterReport, Report, StudentSummaryReport
 from student import (
     GraduateStudent,
@@ -30,7 +36,7 @@ def prompt_grade() -> float:
         except ValueError:
             print("Grade must be a number.")
             continue
-        if 0 <= grade <= 100:
+        if Enrollment.is_valid_grade(grade):
             return grade
         print("Grade must be between 0 and 100.")
 

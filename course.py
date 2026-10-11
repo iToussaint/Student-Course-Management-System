@@ -14,6 +14,17 @@ class Course:
     def title(self) -> str:
         return self._title
 
+    def __repr__(self) -> str:
+        return f"Course(code={self.code!r}, title={self.title!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Course):
+            return NotImplemented
+        return self.code == other.code
+
+    def __hash__(self) -> int:
+        return hash(self.code)
+
 
 # List stores the collection, dictionary maps codes to courses
 courses: list[Course] = []

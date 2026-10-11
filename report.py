@@ -7,10 +7,6 @@ from enrollment import get_roster, get_student_enrollments, student_average
 from student import Student
 
 
-def format_grade(grade: float | None) -> str:
-    return "-" if grade is None else f"{grade:.1f}"
-
-
 class Report(ABC):
     """Base class for all reports. Subclasses supply the title and body lines."""
 
@@ -24,6 +20,10 @@ class Report(ABC):
     def generate(self) -> str:
         return "\n".join([self.title, "-" * len(self.title), *self.lines()])
 
+    @staticmethod
+    def format_grade(grade: float | None) -> str:
+        return "-" if grade is None else f"{grade:.1f}"
+
 
 class StudentSummaryReport(Report):
     def __init__(self, student: Student) -> None:
@@ -31,14 +31,15 @@ class StudentSummaryReport(Report):
 
     @property
     def title(self) -> str:
+        # student.level is polymorphic: each student type supplies its own
         return f"Summary for {self._student.name} ({self._student.id}, {self._student.level})"
 
     def lines(self) -> list[str]:
         enrolled = get_student_enrollments(self._student)
         return [
             f"Courses enrolled: {len(enrolled)}",
-            *[f"  {e.course.code:<8} {e.course.title:<30} Grade: {format_grade(e.grade)}" for e in enrolled],
-            f"Average grade: {format_grade(student_average(self._student))}",
+            *[f"  {e.course.code:<8} {e.course.title:<30} Grade: {self.format_grade(e.grade)}" for e in enrolled],
+            f"Average grade: {self.format_grade(student_average(self._student))}",
         ]
 
 
@@ -55,6 +56,6 @@ class CourseRosterReport(Report):
         if not roster:
             return ["No students enrolled."]
         return [f"{len(roster)} student(s)"] + [
-            f"  {e.student.id}  {e.student.name:<25} {e.student.level:<14} Grade: {format_grade(e.grade)}"
+            f"  {e.student.id}  {e.student.name:<25} {e.student.level:<14} Grade: {self.format_grade(e.grade)}"
             for e in roster
         ]
