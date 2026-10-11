@@ -4,6 +4,10 @@ A console application for managing students, courses, enrollments, and
 grades, built with Python fundamentals, modular design, and object-oriented
 programming.
 
+## Video demonstration
+
+[Watch the demo on Google Drive](https://drive.google.com/file/d/1ZI7EDBFIF5MOHOGi6QWL8aR2VzZtR93v/view?usp=sharing)
+
 ## Features
 
 **Students can:**
